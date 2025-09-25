@@ -133,15 +133,16 @@ class WeatherPlugin(Star):
         super().__init__(context)
 
     @filter.command("天气")
-    async def get_weather(self, event: AstrMessageEvent):
+    # [修正] 使用唯一正确的函数签名，以防止 TypeError
+    async def get_weather(self, event: AstrMessageEvent, args: tuple = ()):
         """
         获取指定城市的天气信息并以图片形式发送。
         """
-        city = event.message_str.strip()
-
-        if not city:
+        if not args:
             yield event.plain_result("请输入要查询的城市，例如：!天气 北京")
             return
+
+        city = " ".join(args)
 
         api_url = f"https://60s.viki.moe/v2/weather?query={city}"
         try:
@@ -150,13 +151,11 @@ class WeatherPlugin(Star):
                 response.raise_for_status()
                 data = response.json()
 
-            # [最终修正] 更改成功判断逻辑：检查 'data' 字段是否存在且不为空
-            if not data.get("data"):
-                # 如果 'data' 字段不存在或为 null，则认为查询失败
+            # [修正] 采用更严格的校验，防止 'KeyError'
+            weather_data = data.get("data")
+            if not weather_data or "location" not in weather_data:
                 yield event.plain_result(f"查询失败: {data.get('message', '无法获取到该城市的天气数据')}")
                 return
-
-            weather_data = data["data"]
 
             desired_keys = ['clothes', 'sports', 'cold', 'ultraviolet', 'carwash', 'tourism']
             all_indices = weather_data.get("life_indices", [])
@@ -184,6 +183,7 @@ class WeatherPlugin(Star):
             logger.error(f"请求天气API时出错: {e}")
             yield event.plain_result(f"网络错误，无法连接到天气服务。")
         except KeyError as e:
+            # 这里的 KeyError 作为一个备用安全网，理论上不应该再被触发
             logger.error(f"解析天气数据时缺少键: {e}")
             yield event.plain_result(f"无法解析'{city}'的天气数据，请确保城市名称正确。")
         except Exception as e:
