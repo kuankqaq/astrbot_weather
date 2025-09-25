@@ -3,7 +3,7 @@ from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
 
-# [V5] 最终版模板，恢复宽度并启用高清渲染
+# 最终版模板
 WEATHER_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -18,7 +18,7 @@ WEATHER_TEMPLATE = """
             background-color: #525f75;
             color: #f8f9fa;
             padding: 20px;
-            width: 500px; /* [恢复] 将宽度恢复到 500px，优化布局 */
+            width: 500px;
             box-sizing: border-box;
             margin: 0;
         }
@@ -133,10 +133,15 @@ class WeatherPlugin(Star):
         super().__init__(context)
 
     @filter.command("天气")
-    async def get_weather(self, event: AstrMessageEvent, city: str = None):
+    # [修复] 修改函数签名，不再直接接收 city 参数，以解决参数不匹配的错误
+    async def get_weather(self, event: AstrMessageEvent):
         """
         获取指定城市的天气信息并以图片形式发送。
         """
+        # [更新] 从 event.message_str 中手动获取城市名称
+        # .strip() 用于去除用户可能输入的多余空格
+        city = event.message_str.strip()
+
         if not city:
             yield event.plain_result("请输入要查询的城市，例如：/天气 北京")
             return
@@ -168,13 +173,11 @@ class WeatherPlugin(Star):
                 "sunrise": weather_data["sunrise"],
                 "life_tips": display_tips
             }
-
-            # [新增] 定义高清渲染选项，使用2倍像素密度
+            
             render_options = {
                 "device_scale_factor": 2
             }
 
-            # [更新] 调用html_render时传入高清选项
             image_url = await self.html_render(WEATHER_TEMPLATE, render_payload, options=render_options)
             yield event.image_result(image_url)
 
