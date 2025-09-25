@@ -108,7 +108,7 @@ def find_life_index(indices, key):
     "weather", 
     "kuank", # 在这里替换成你的名字
     "通过指令查询实时天气信息", 
-    "1.1.0", # 版本号+1
+    "1.1.2", 
     "https://github.com/astrbot_weather" # 在这里替换成你的仓库地址
 )
 class WeatherPlugin(Star):
@@ -126,7 +126,7 @@ class WeatherPlugin(Star):
         # --- 判断结束 ---
         
         # API 地址
-        url = f"https://60s.viki.moe/v2/weather?location={city}"
+        url = f"https://60s.viki.moe/v2/weather?encoding={city}"
         
         try:
             # 使用 httpx 进行异步网络请求
