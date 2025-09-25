@@ -106,10 +106,10 @@ def find_life_index(indices, key):
 
 @register(
     "weather", 
-    "YourName", # 在这里替换成你的名字
+    "kuank", # 在这里替换成你的名字
     "通过指令查询实时天气信息", 
     "1.1.0", # 版本号+1
-    "https://github.com/your-repo" # 在这里替换成你的仓库地址
+    "https://github.com/astrbot_weather" # 在这里替换成你的仓库地址
 )
 class WeatherPlugin(Star):
     def __init__(self, context: Context):
