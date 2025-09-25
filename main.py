@@ -133,18 +133,11 @@ class WeatherPlugin(Star):
         super().__init__(context)
 
     @filter.command("天气")
-    # [修正] 这是解决“参数不匹配”问题的关键：使用无参数的函数签名
     async def get_weather(self, event: AstrMessageEvent):
         """
         获取指定城市的天气信息并以图片形式发送。
         """
-        # 从 event.message_str 中手动获取城市名称
-        # .strip() 用于去除用户可能输入的多余空格
-        message_content = event.message_str.strip()
-        
-        # message_str 会包含指令后的所有内容，我们需要把它提取出来
-        # 假设指令是 "/天气 北京"，event.message_str 是 "北京"
-        city = message_content
+        city = event.message_str.strip()
 
         if not city:
             yield event.plain_result("请输入要查询的城市，例如：/天气 北京")
@@ -157,7 +150,8 @@ class WeatherPlugin(Star):
                 response.raise_for_status()
                 data = response.json()
 
-            if data.get("code") != 200:
+            # [修复] 将获取到的 code 转换为整数再进行比较，解决数据类型不匹配的问题
+            if int(data.get("code")) != 200:
                 yield event.plain_result(f"查询失败: {data.get('message', '未知错误')}")
                 return
 
