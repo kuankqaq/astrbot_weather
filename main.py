@@ -132,60 +132,60 @@ class WeatherPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
 
-    @filter.command("天气")
-    # [修正] 使用唯一正确的函数签名，以防止 TypeError
-    async def get_weather(self, event: AstrMessageEvent, args: tuple = ()):
-        """
-        获取指定城市的天气信息并以图片形式发送。
-        """
-        if not args:
-            yield event.plain_result("请输入要查询的城市，例如：!天气 北京")
+@filter.command("天气")
+async def get_weather(self, event: AstrMessageEvent, *args: str):
+    """
+    获取指定城市的天气信息并以图片形式发送。
+    """
+    if not args:
+        yield event.plain_result("请输入要查询的城市，例如：!天气 北京")
+        return
+
+    city = " ".join(args)
+    # ... 后续代码不变
+
+    api_url = f"https://60s.viki.moe/v2/weather?query={city}"
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(api_url, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+
+        # [修正] 采用更严格的校验，防止 'KeyError'
+        weather_data = data.get("data")
+        if not weather_data or "location" not in weather_data:
+            yield event.plain_result(f"查询失败: {data.get('message', '无法获取到该城市的天气数据')}")
             return
 
-        city = " ".join(args)
+        desired_keys = ['clothes', 'sports', 'cold', 'ultraviolet', 'carwash', 'tourism']
+        all_indices = weather_data.get("life_indices", [])
+        
+        display_tips = [
+            tip for tip in all_indices if tip['key'] in desired_keys
+        ]
 
-        api_url = f"https://60s.viki.moe/v2/weather?query={city}"
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(api_url, timeout=10)
-                response.raise_for_status()
-                data = response.json()
+        render_payload = {
+            "location": weather_data["location"],
+            "weather": weather_data["weather"],
+            "air": weather_data["air_quality"],
+            "sunrise": weather_data["sunrise"],
+            "life_tips": display_tips
+        }
+        
+        render_options = {
+            "device_scale_factor": 2
+        }
 
-            # [修正] 采用更严格的校验，防止 'KeyError'
-            weather_data = data.get("data")
-            if not weather_data or "location" not in weather_data:
-                yield event.plain_result(f"查询失败: {data.get('message', '无法获取到该城市的天气数据')}")
-                return
+        image_url = await self.html_render(WEATHER_TEMPLATE, render_payload, options=render_options)
+        yield event.image_result(image_url)
 
-            desired_keys = ['clothes', 'sports', 'cold', 'ultraviolet', 'carwash', 'tourism']
-            all_indices = weather_data.get("life_indices", [])
-            
-            display_tips = [
-                tip for tip in all_indices if tip['key'] in desired_keys
-            ]
-
-            render_payload = {
-                "location": weather_data["location"],
-                "weather": weather_data["weather"],
-                "air": weather_data["air_quality"],
-                "sunrise": weather_data["sunrise"],
-                "life_tips": display_tips
-            }
-            
-            render_options = {
-                "device_scale_factor": 2
-            }
-
-            image_url = await self.html_render(WEATHER_TEMPLATE, render_payload, options=render_options)
-            yield event.image_result(image_url)
-
-        except httpx.RequestError as e:
-            logger.error(f"请求天气API时出错: {e}")
-            yield event.plain_result(f"网络错误，无法连接到天气服务。")
-        except KeyError as e:
-            # 这里的 KeyError 作为一个备用安全网，理论上不应该再被触发
-            logger.error(f"解析天气数据时缺少键: {e}")
-            yield event.plain_result(f"无法解析'{city}'的天气数据，请确保城市名称正确。")
-        except Exception as e:
-            logger.error(f"处理天气查询时发生未知错误: {e}")
-            yield event.plain_result(f"查询天气时发生未知错误。")
+    except httpx.RequestError as e:
+        logger.error(f"请求天气API时出错: {e}")
+        yield event.plain_result(f"网络错误，无法连接到天气服务。")
+    except KeyError as e:
+        # 这里的 KeyError 作为一个备用安全网，理论上不应该再被触发
+        logger.error(f"解析天气数据时缺少键: {e}")
+        yield event.plain_result(f"无法解析'{city}'的天气数据，请确保城市名称正确。")
+    except Exception as e:
+        logger.error(f"处理天气查询时发生未知错误: {e}")
+        yield event.plain_result(f"查询天气时发生未知错误。")
