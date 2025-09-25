@@ -112,7 +112,7 @@ def find_life_index(indices, key):
     "weather", 
     "kuank", 
     "通过指令查询实时天气信息", 
-    "1.1.4", 
+    "1.1.5", 
     "https://github.com/kuankqaq/astrbot_weather"
 )
 class WeatherPlugin(Star):
@@ -125,24 +125,26 @@ class WeatherPlugin(Star):
         if not city:
             yield event.plain_result("请输入要查询的城市，例如：/天气 北京")
             return
-        
-        # --- 修正点 2: 对城市进行URL转义，并使用正确的API参数'encoding' ---
+
+        logger.info(f"用户输入城市: {city}")
         encoded_city = quote(city)
         url = f"https://60s.viki.moe/v2/weather?encoding={encoded_city}"
-        
+
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(url, timeout=10)
                 response.raise_for_status()
-                
+
             weather_data = response.json()
-            
+            logger.info(f"API返回: {weather_data}")
+
             if weather_data.get("code") != 200:
                 error_message = weather_data.get("message", "未知错误")
                 yield event.plain_result(f"查询「{city}」天气失败：{error_message}")
                 return
 
             data = weather_data["data"]
+            logger.info(f"API返回城市: {data.get('location', {}).get('name', '未知')} (用户输入: {city})")
             render_context = {
                 "data": data,
                 "indices": {
@@ -151,7 +153,7 @@ class WeatherPlugin(Star):
                     "ultraviolet": find_life_index(data['life_indices'], 'ultraviolet'),
                 }
             }
-            
+
             image_url = await self.html_render(WEATHER_TEMPLATE, render_context)
             yield event.image_result(image_url)
 
