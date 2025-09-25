@@ -1,165 +1,168 @@
 import httpx
-from urllib.parse import quote # 导入用于URL转义的函数
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
 
-# --- CSS部分已修正 ---
+# 用于渲染天气图片的 HTML + Jinja2 模板
 WEATHER_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>天气信息</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&display=swap');
         body {
-            /* --- 修正点 1: 移除外边距，并设置为内联块元素以实现尺寸自适应 --- */
-            margin: 0;
-            display: inline-block; 
-            
-            font-family: -apple-system, 'Noto Sans SC', 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', '微软雅黑', Arial, sans-serif;
-            background: linear-gradient(135deg, {{ data.weather.weather_colors[0] | default('#4891FF') }}, {{ data.weather.weather_colors[1] | default('#9AD2F9') }});
-            color: white;
+            font-family: 'Noto Sans SC', sans-serif;
+            background: linear-gradient(135deg, {{ weather.weather_colors[0] }}, {{ weather.weather_colors[1] }});
+            color: #fff;
             padding: 20px;
-            width: 420px;
+            width: 500px;
+        }
+        .container {
+            background-color: rgba(0, 0, 0, 0.3);
             border-radius: 15px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.25);
-            box-sizing: border-box;
+            padding: 20px;
         }
         .header {
             display: flex;
             justify-content: space-between;
-            align-items: flex-end;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+            align-items: center;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.5);
             padding-bottom: 10px;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
         }
-        .location { font-size: 26px; font-weight: bold; }
-        .updated { font-size: 13px; opacity: 0.8; }
+        .header h1 {
+            font-size: 28px;
+            margin: 0;
+        }
+        .header .updated {
+            font-size: 14px;
+            opacity: 0.8;
+        }
         .main-weather {
             display: flex;
             align-items: center;
             justify-content: space-around;
-            padding: 10px 0;
+            text-align: center;
+            margin: 20px 0;
         }
-        .temperature { font-size: 64px; font-weight: bold; }
-        .condition { text-align: center; }
-        .condition img { width: 60px; height: 60px; }
-        .condition span { display: block; font-size: 18px; margin-top: 5px; font-weight: 500; }
+        .main-weather .temp {
+            font-size: 72px;
+            font-weight: bold;
+        }
+        .main-weather .condition {
+            font-size: 24px;
+        }
         .details {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            font-size: 14px;
-            background: rgba(0, 0, 0, 0.15);
-            padding: 15px;
-            border-radius: 10px;
-            margin-top: 15px;
+            gap: 15px;
+            font-size: 16px;
         }
-        .detail-item { display: flex; align-items: center; }
-        .detail-item strong { margin-right: 8px; opacity: 0.9; }
-        .indices { margin-top: 20px; }
-        .indices h3 {
-            font-size: 16px; margin-top:0; margin-bottom: 10px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
-            padding-bottom: 5px; font-weight: bold;
+        .details div {
+            background-color: rgba(0, 0, 0, 0.2);
+            padding: 10px;
+            border-radius: 8px;
         }
-        .index-item { font-size: 14px; margin-bottom: 8px; line-height: 1.5; }
-        .index-item strong { font-weight: bold; }
+        .tips {
+            margin-top: 20px;
+            border-top: 2px solid rgba(255, 255, 255, 0.5);
+            padding-top: 10px;
+        }
+        .tips h2 {
+            font-size: 20px;
+            margin-bottom: 10px;
+        }
+        .tips p {
+            font-size: 16px;
+            margin: 5px 0;
+        }
     </style>
 </head>
 <body>
-    <div class="header">
-        <span class="location">{{ data.location.name }}</span>
-        <span class="updated">更新于 {{ data.weather.updated.split(' ')[1] }}</span>
-    </div>
-
-    <div class="main-weather">
-        <span class="temperature">{{ data.weather.temperature }}°</span>
-        <div class="condition">
-            <img src="{{ data.weather.weather_icon }}" alt="{{ data.weather.condition }}">
-            <span>{{ data.weather.condition }}</span>
+    <div class="container">
+        <div class="header">
+            <h1>{{ location.name }}</h1>
+            <span class="updated">更新于: {{ weather.updated.split(' ')[1] }}</span>
         </div>
-    </div>
-
-    <div class="details">
-        <div class="detail-item"><strong>湿度</strong> {{ data.weather.humidity }}%</div>
-        <div class="detail-item"><strong>风力</strong> {{ data.weather.wind_direction }} {{ data.weather.wind_power }}级</div>
-        <div class="detail-item"><strong>空气</strong> {{ data.air_quality.quality }} ({{ data.air_quality.aqi }})</div>
-        <div class="detail-item"><strong>紫外线</strong> {{ indices.ultraviolet.level }}</div>
-    </div>
-    
-    <div class="indices">
-        <h3>生活指数</h3>
-        <div class="index-item">
-            <strong>穿衣建议:</strong> {{ indices.clothes.description }}
+        <div class="main-weather">
+            <img src="{{ weather.weather_icon }}" alt="weather_icon" width="80" height="80">
+            <div>
+                <div class="temp">{{ weather.temperature }}°</div>
+                <div class="condition">{{ weather.condition }}</div>
+            </div>
         </div>
-        <div class="index-item">
-            <strong>感冒风险:</strong> {{ indices.cold.description }}
+        <div class="details">
+            <div><strong>湿度:</strong> {{ weather.humidity }}%</div>
+            <div><strong>风力:</strong> {{ weather.wind_direction }} {{ weather.wind_power }}级</div>
+            <div><strong>空气质量:</strong> {{ air.quality }} (AQI: {{ air.aqi }})</div>
+            <div><strong>日出/日落:</strong> {{ sunrise.sunrise_desc }} / {{ sunrise.sunset_desc }}</div>
+        </div>
+        <div class="tips">
+            <h2>生活小贴士</h2>
+            <p><strong>穿衣:</strong> {{ clothes.description }}</p>
+            <p><strong>运动:</strong> {{ sports.description }}</p>
         </div>
     </div>
 </body>
 </html>
 """
 
-def find_life_index(indices, key):
-    for index in indices:
-        if index['key'] == key:
-            return index
-    return {"level": "暂无", "description": "暂无数据"}
-
-@register(
-    "weather", 
-    "kuank", 
-    "通过指令查询实时天气信息", 
-    "1.1.8", 
-    "https://github.com/kuankqaq/astrbot_weather"
-)
+@register("weather", "Assistant", "一个简单的天气查询插件", "1.0.0")
 class WeatherPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
-        logger.info("天气查询插件加载成功。")
 
     @filter.command("天气")
     async def get_weather(self, event: AstrMessageEvent, city: str = None):
+        """
+        获取指定城市的天气信息并以图片形式发送。
+        """
+        # [新增] 检查用户是否输入了城市
         if not city:
             yield event.plain_result("请输入要查询的城市，例如：/天气 北京")
             return
 
-        logger.info(f"用户输入城市: {city}")
-        encoded_city = quote(city)
-        url = f"https://60s.viki.moe/v2/weather?encoding={encoded_city}"
-
+        api_url = f"https://60s.viki.moe/v2/weather?query={city}"
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.get(url, timeout=10)
+                response = await client.get(api_url, timeout=10)
                 response.raise_for_status()
+                data = response.json()
 
-            weather_data = response.json()
-            logger.info(f"API返回: {weather_data}")
-
-            if weather_data.get("code") != 200:
-                error_message = weather_data.get("message", "未知错误")
-                yield event.plain_result(f"查询「{city}」天气失败：{error_message}")
+            if data.get("code") != 200:
+                yield event.plain_result(f"查询失败: {data.get('message', '未知错误')}")
                 return
 
-            data = weather_data["data"]
-            logger.info(f"API返回城市: {data.get('location', {}).get('name', '未知')} (用户输入: {city})")
-            render_context = {
-                "data": data,
-                "indices": {
-                    "clothes": find_life_index(data['life_indices'], 'clothes'),
-                    "cold": find_life_index(data['life_indices'], 'cold'),
-                    "ultraviolet": find_life_index(data['life_indices'], 'ultraviolet'),
-                }
+            weather_data = data["data"]
+
+            # 从生活指数中找到穿衣和运动建议
+            life_indices = weather_data.get("life_indices", [])
+            clothes_tip = next((item for item in life_indices if item['key'] == 'clothes'), {"description": "暂无"})
+            sports_tip = next((item for item in life_indices if item['key'] == 'sports'), {"description": "暂无"})
+
+            # 准备渲染模板所需的数据
+            render_payload = {
+                "location": weather_data["location"],
+                "weather": weather_data["weather"],
+                "air": weather_data["air_quality"],
+                "sunrise": weather_data["sunrise"],
+                "clothes": clothes_tip,
+                "sports": sports_tip
             }
 
-            image_url = await self.html_render(WEATHER_TEMPLATE, render_context)
+            # 调用html_render方法生成图片并获取URL
+            image_url = await self.html_render(WEATHER_TEMPLATE, render_payload)
             yield event.image_result(image_url)
 
         except httpx.RequestError as e:
-            logger.error(f"天气API请求失败: {e}")
-            yield event.plain_result(f"网络请求失败，无法查询「{city}」的天气。")
+            logger.error(f"请求天气API时出错: {e}")
+            yield event.plain_result(f"网络错误，无法连接到天气服务。")
+        except KeyError as e:
+            logger.error(f"解析天气数据时缺少键: {e}")
+            yield event.plain_result(f"无法解析'{city}'的天气数据，请确保城市名称正确。")
         except Exception as e:
-            logger.error(f"处理天气数据时发生未知错误: {e}")
-            yield event.plain_result(f"处理「{city}」的天气数据时发生了一个内部错误。")
+            logger.error(f"处理天气查询时发生未知错误: {e}")
+            yield event.plain_result(f"查询天气时发生未知错误。")
