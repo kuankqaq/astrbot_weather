@@ -1,7 +1,10 @@
 import httpx
+import os
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
+from jinja2 import Template
+from playwright.async_api import async_playwright
 
 # 最终版模板（保持不变）
 WEATHER_TEMPLATE = """
@@ -136,6 +139,9 @@ class WeatherPlugin(Star):
     async def get_weather(self, event: AstrMessageEvent, city: str = ""):
         """
         获取指定城市的天气信息并以图片形式发送。
+
+        Args:
+            city (string): 城市名称（例如：北京、New York）
         """
         if not city:
             yield event.plain_result("请输入要查询的城市，例如：!天气 北京")
@@ -173,7 +179,6 @@ class WeatherPlugin(Star):
                 "device_scale_factor": 2
             }
 
-            # 调用 html_render（如果未定义，会报错；下面提供了示例实现）
             image_url = await self.html_render(WEATHER_TEMPLATE, render_payload, options=render_options)
             yield event.image_result(image_url)
 
@@ -187,13 +192,11 @@ class WeatherPlugin(Star):
             logger.error(f"处理天气查询时发生未知错误: {e}")
             yield event.plain_result(f"查询天气时发生未知错误。")
 
-    # 如果 html_render 未定义，在类中添加这个方法（示例：使用 jinja2 渲染 + playwright 生成图片）
-    # 需安装依赖：pip install jinja2 playwright
-    # 并在 requirements.txt 添加：jinja2 和 playwright
     async def html_render(self, template: str, payload: dict, options: dict):
-        from jinja2 import Template
-        from playwright.async_api import async_playwright
-        import os
+        # 持久化数据存储到 AstrBot/data/plugins/weather/
+        data_dir = os.path.join("data", "plugins", "weather")
+        os.makedirs(data_dir, exist_ok=True)
+        image_path = os.path.join(data_dir, "weather.png")
 
         # 渲染 HTML
         jinja_template = Template(template)
@@ -204,11 +207,7 @@ class WeatherPlugin(Star):
             browser = await p.chromium.launch(headless=True)
             page = await browser.new_page(device_scale_factor=options.get("device_scale_factor", 1))
             await page.set_content(html_content)
-            image_path = "weather.png"  # 保存到插件 data 目录，避免覆盖（参考文档原则3）
-            data_dir = os.path.join(self.context.data_dir, "weather")  # 使用 context.data_dir 持久化
-            os.makedirs(data_dir, exist_ok=True)
-            full_path = os.path.join(data_dir, image_path)
-            await page.screenshot(path=full_path, full_page=True)
+            await page.screenshot(path=image_path, full_page=True)
             await browser.close()
         
-        return full_path  # 返回本地路径，或上传到服务器返回 URL
+        return image_path
