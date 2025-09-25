@@ -3,7 +3,7 @@ from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
 
-# 用于渲染天气图片的 HTML + Jinja2 模板
+# [V2] 更新了HTML模板，优化了样式并增加了更多生活指数的展示
 WEATHER_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -12,72 +12,87 @@ WEATHER_TEMPLATE = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>天气信息</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap');
         body {
             font-family: 'Noto Sans SC', sans-serif;
-            background: linear-gradient(135deg, {{ weather.weather_colors[0] }}, {{ weather.weather_colors[1] }});
-            color: #fff;
+            background-color: #525f75; /* 更新背景为更接近示例的灰蓝色 */
+            color: #f8f9fa;
             padding: 20px;
             width: 500px;
+            box-sizing: border-box;
         }
         .container {
-            background-color: rgba(0, 0, 0, 0.3);
-            border-radius: 15px;
-            padding: 20px;
+            background-color: #3e4a5d; /* 更新容器背景色 */
+            border-radius: 12px;
+            padding: 25px;
         }
         .header {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            border-bottom: 2px solid rgba(255, 255, 255, 0.5);
-            padding-bottom: 10px;
-            margin-bottom: 10px;
+            align-items: baseline;
+            border-bottom: 1px solid #525f75;
+            padding-bottom: 15px;
+            margin-bottom: 15px;
         }
         .header h1 {
-            font-size: 28px;
+            font-size: 26px;
+            font-weight: 700;
             margin: 0;
         }
         .header .updated {
-            font-size: 14px;
-            opacity: 0.8;
+            font-size: 13px;
+            color: #adb5bd;
         }
         .main-weather {
             display: flex;
             align-items: center;
-            justify-content: space-around;
-            text-align: center;
-            margin: 20px 0;
+            justify-content: flex-start;
+            gap: 20px;
+            text-align: left;
+            margin: 25px 5px;
         }
         .main-weather .temp {
-            font-size: 72px;
-            font-weight: bold;
+            font-size: 68px;
+            font-weight: 700;
+            line-height: 1;
         }
         .main-weather .condition {
-            font-size: 24px;
+            font-size: 22px;
+            font-weight: 500;
+        }
+        .main-weather img {
+            width: 70px;
+            height: 70px;
         }
         .details {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            font-size: 16px;
+            gap: 12px;
+            font-size: 14px;
         }
         .details div {
-            background-color: rgba(0, 0, 0, 0.2);
-            padding: 10px;
+            background-color: #4a5568;
+            padding: 12px;
             border-radius: 8px;
         }
         .tips {
             margin-top: 20px;
-            border-top: 2px solid rgba(255, 255, 255, 0.5);
-            padding-top: 10px;
+            border-top: 1px solid #525f75;
+            padding-top: 15px;
         }
         .tips h2 {
-            font-size: 20px;
-            margin-bottom: 10px;
+            font-size: 18px;
+            margin-bottom: 12px;
+            font-weight: 700;
         }
         .tips p {
-            font-size: 16px;
-            margin: 5px 0;
+            font-size: 14px;
+            margin: 8px 0;
+            line-height: 1.6;
+        }
+        .tips strong {
+            color: #ced4da;
+            font-weight: 500;
         }
     </style>
 </head>
@@ -88,7 +103,7 @@ WEATHER_TEMPLATE = """
             <span class="updated">更新于: {{ weather.updated.split(' ')[1] }}</span>
         </div>
         <div class="main-weather">
-            <img src="{{ weather.weather_icon }}" alt="weather_icon" width="80" height="80">
+            <img src="{{ weather.weather_icon }}" alt="weather_icon">
             <div>
                 <div class="temp">{{ weather.temperature }}°</div>
                 <div class="condition">{{ weather.condition }}</div>
@@ -102,8 +117,9 @@ WEATHER_TEMPLATE = """
         </div>
         <div class="tips">
             <h2>生活小贴士</h2>
-            <p><strong>穿衣:</strong> {{ clothes.description }}</p>
-            <p><strong>运动:</strong> {{ sports.description }}</p>
+            {% for tip in life_tips %}
+            <p><strong>{{ tip.name }}:</strong> {{ tip.description }}</p>
+            {% endfor %}
         </div>
     </div>
 </body>
@@ -120,7 +136,6 @@ class WeatherPlugin(Star):
         """
         获取指定城市的天气信息并以图片形式发送。
         """
-        # [新增] 检查用户是否输入了城市
         if not city:
             yield event.plain_result("请输入要查询的城市，例如：/天气 北京")
             return
@@ -138,10 +153,14 @@ class WeatherPlugin(Star):
 
             weather_data = data["data"]
 
-            # 从生活指数中找到穿衣和运动建议
-            life_indices = weather_data.get("life_indices", [])
-            clothes_tip = next((item for item in life_indices if item['key'] == 'clothes'), {"description": "暂无"})
-            sports_tip = next((item for item in life_indices if item['key'] == 'sports'), {"description": "暂无"})
+            # [新增] 定义我们希望展示的生活指数的key
+            desired_keys = ['clothes', 'sports', 'cold', 'ultraviolet', 'carwash', 'tourism']
+            all_indices = weather_data.get("life_indices", [])
+            
+            # [新增] 筛选出需要的生活指数
+            display_tips = [
+                tip for tip in all_indices if tip['key'] in desired_keys
+            ]
 
             # 准备渲染模板所需的数据
             render_payload = {
@@ -149,8 +168,7 @@ class WeatherPlugin(Star):
                 "weather": weather_data["weather"],
                 "air": weather_data["air_quality"],
                 "sunrise": weather_data["sunrise"],
-                "clothes": clothes_tip,
-                "sports": sports_tip
+                "life_tips": display_tips # 传入筛选后的列表
             }
 
             # 调用html_render方法生成图片并获取URL
