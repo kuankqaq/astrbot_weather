@@ -18,7 +18,7 @@ WEATHER_TEMPLATE = """
             background-color: #525f75;
             color: #f8f9fa;
             padding: 20px;
-            width: 500px;
+            width: 350px;
             box-sizing: border-box;
         }
         .container {

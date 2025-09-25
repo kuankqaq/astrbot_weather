@@ -1,5 +1,5 @@
 # plugin.yaml
-name: "天气查询"
+name: "weather"
 author: "kuank"
 description: "一个简单的天气查询插件，输入 /天气 <城市> 来查询天气信息。"
 version: "1.2.3"
