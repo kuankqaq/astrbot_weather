@@ -128,7 +128,7 @@ class WeatherPlugin(Star):
 
         logger.info(f"用户输入城市: {city}")
         encoded_city = quote(city)
-url = f"https://60s.viki.moe/v2/weather?query={encoded_city}&encoding=json"
+        url = f"https://60s.viki.moe/v2/weather?encoding={encoded_city}"
 
         try:
             async with httpx.AsyncClient() as client:
