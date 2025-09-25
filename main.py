@@ -3,7 +3,7 @@ from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
 
-# [V2] 更新了HTML模板，优化了样式并增加了更多生活指数的展示
+# [V3] 最终版模板，增加了生活指数的“等级”(level)参数显示
 WEATHER_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -15,14 +15,14 @@ WEATHER_TEMPLATE = """
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap');
         body {
             font-family: 'Noto Sans SC', sans-serif;
-            background-color: #525f75; /* 更新背景为更接近示例的灰蓝色 */
+            background-color: #525f75;
             color: #f8f9fa;
             padding: 20px;
             width: 500px;
             box-sizing: border-box;
         }
         .container {
-            background-color: #3e4a5d; /* 更新容器背景色 */
+            background-color: #3e4a5d;
             border-radius: 12px;
             padding: 25px;
         }
@@ -118,7 +118,8 @@ WEATHER_TEMPLATE = """
         <div class="tips">
             <h2>生活小贴士</h2>
             {% for tip in life_tips %}
-            <p><strong>{{ tip.name }}:</strong> {{ tip.description }}</p>
+            {# [更新] 在描述前增加了 tip.level 参数 #}
+            <p><strong>{{ tip.name }}:</strong> {{ tip.level }}。{{ tip.description }}</p>
             {% endfor %}
         </div>
     </div>
@@ -153,11 +154,11 @@ class WeatherPlugin(Star):
 
             weather_data = data["data"]
 
-            # [新增] 定义我们希望展示的生活指数的key
+            # 定义我们希望展示的生活指数的key
             desired_keys = ['clothes', 'sports', 'cold', 'ultraviolet', 'carwash', 'tourism']
             all_indices = weather_data.get("life_indices", [])
             
-            # [新增] 筛选出需要的生活指数
+            # 筛选出需要的生活指数
             display_tips = [
                 tip for tip in all_indices if tip['key'] in desired_keys
             ]
@@ -168,7 +169,7 @@ class WeatherPlugin(Star):
                 "weather": weather_data["weather"],
                 "air": weather_data["air_quality"],
                 "sunrise": weather_data["sunrise"],
-                "life_tips": display_tips # 传入筛选后的列表
+                "life_tips": display_tips
             }
 
             # 调用html_render方法生成图片并获取URL
