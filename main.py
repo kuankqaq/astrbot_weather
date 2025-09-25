@@ -133,17 +133,17 @@ class WeatherPlugin(Star):
         super().__init__(context)
 
     @filter.command("天气")
-    # [最终修正] 使用 *args 接收所有指令后的参数，以解决参数不匹配的 TypeError
-    async def get_weather(self, event: AstrMessageEvent, *args: str):
+    # [最终修正] 接收一个名为 'args' 的关键字参数，并为其提供默认值
+    async def get_weather(self, event: AstrMessageEvent, args: tuple = ()):
         """
         获取指定城市的天气信息并以图片形式发送。
         """
-        # 检查 args 是否为空。如果为空，说明用户只发送了 "!天气"
+        # 检查 args 是否为空元组
         if not args:
             yield event.plain_result("请输入要查询的城市，例如：!天气 北京")
             return
 
-        # 如果用户输入了多个词（如 "天气 纽约"），将它们合并成一个字符串
+        # 将元组内的所有部分连接成一个字符串，以支持带空格的城市名
         city = " ".join(args)
 
         api_url = f"https://60s.viki.moe/v2/weather?query={city}"
