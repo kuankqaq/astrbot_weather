@@ -1,9 +1,10 @@
 import httpx
+from urllib.parse import quote # 导入用于URL转义的函数
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
 
-# 用于渲染天气卡片的 HTML + Jinja2 模板
+# --- CSS部分已修正 ---
 WEATHER_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -12,6 +13,10 @@ WEATHER_TEMPLATE = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body {
+            /* --- 修正点 1: 移除外边距，并设置为内联块元素以实现尺寸自适应 --- */
+            margin: 0;
+            display: inline-block; 
+            
             font-family: -apple-system, 'Noto Sans SC', 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', '微软雅黑', Arial, sans-serif;
             background: linear-gradient(135deg, {{ data.weather.weather_colors[0] | default('#4891FF') }}, {{ data.weather.weather_colors[1] | default('#9AD2F9') }});
             color: white;
@@ -98,7 +103,6 @@ WEATHER_TEMPLATE = """
 """
 
 def find_life_index(indices, key):
-    """一个辅助函数，用于从生活指数列表中查找特定项"""
     for index in indices:
         if index['key'] == key:
             return index
@@ -106,10 +110,10 @@ def find_life_index(indices, key):
 
 @register(
     "weather", 
-    "kuank", # 在这里替换成你的名字
+    "kuank", 
     "通过指令查询实时天气信息", 
-    "1.1.2", 
-    "https://github.com/astrbot_weather" # 在这里替换成你的仓库地址
+    "1.1.4", 
+    "https://github.com/kuankqaq/astrbot_weather"
 )
 class WeatherPlugin(Star):
     def __init__(self, context: Context):
@@ -117,19 +121,16 @@ class WeatherPlugin(Star):
         logger.info("天气查询插件加载成功。")
 
     @filter.command("天气")
-    # 将 city 参数设置为可选，默认值为 None
     async def get_weather(self, event: AstrMessageEvent, city: str = None):
-        # --- 新增：判断用户是否输入城市 ---
         if not city:
             yield event.plain_result("请输入要查询的城市，例如：/天气 北京")
-            return # 结束函数，不再继续执行
-        # --- 判断结束 ---
+            return
         
-        # API 地址
-        url = f"https://60s.viki.moe/v2/weather?encoding={city}"
+        # --- 修正点 2: 对城市进行URL转义，并使用正确的API参数'encoding' ---
+        encoded_city = quote(city)
+        url = f"https://60s.viki.moe/v2/weather?encoding={encoded_city}"
         
         try:
-            # 使用 httpx 进行异步网络请求
             async with httpx.AsyncClient() as client:
                 response = await client.get(url, timeout=10)
                 response.raise_for_status()
