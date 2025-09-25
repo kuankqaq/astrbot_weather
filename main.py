@@ -162,4 +162,4 @@ class WeatherPlugin(Star):
             yield event.plain_result(f"网络请求失败，无法查询「{city}」的天气。")
         except Exception as e:
             logger.error(f"处理天气数据时发生未知错误: {e}")
-            yield event.plain_result(f"处理「{city}」的天气数据时发生了一个内部错误。"）
+            yield event.plain_result(f"处理「{city}」的天气数据时发生了一个内部错误。")
