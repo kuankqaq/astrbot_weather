@@ -112,7 +112,7 @@ def find_life_index(indices, key):
     "weather", 
     "kuank", 
     "通过指令查询实时天气信息", 
-    "1.1.5", 
+    "1.1.6", 
     "https://github.com/kuankqaq/astrbot_weather"
 )
 class WeatherPlugin(Star):
