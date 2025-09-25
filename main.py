@@ -133,13 +133,10 @@ class WeatherPlugin(Star):
         super().__init__(context)
 
     @filter.command("天气")
-    # [最终修正] 采用最稳定、最基础的函数签名，手动解析参数
     async def get_weather(self, event: AstrMessageEvent):
         """
         获取指定城市的天气信息并以图片形式发送。
         """
-        # event.message_str 包含指令之后的所有文本
-        # .strip() 用于去除用户可能输入的多余空格
         city = event.message_str.strip()
 
         if not city:
@@ -153,8 +150,10 @@ class WeatherPlugin(Star):
                 response.raise_for_status()
                 data = response.json()
 
-            if int(data.get("code")) != 200:
-                yield event.plain_result(f"查询失败: {data.get('message', '未知错误')}")
+            # [最终修正] 更改成功判断逻辑：检查 'data' 字段是否存在且不为空
+            if not data.get("data"):
+                # 如果 'data' 字段不存在或为 null，则认为查询失败
+                yield event.plain_result(f"查询失败: {data.get('message', '无法获取到该城市的天气数据')}")
                 return
 
             weather_data = data["data"]
