@@ -3,7 +3,7 @@ from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
 
-# [V3] 最终版模板，增加了生活指数的“等级”(level)参数显示
+# [V5] 最终版模板，恢复宽度并启用高清渲染
 WEATHER_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -18,8 +18,9 @@ WEATHER_TEMPLATE = """
             background-color: #525f75;
             color: #f8f9fa;
             padding: 20px;
-            width: 350px;
+            width: 500px; /* [恢复] 将宽度恢复到 500px，优化布局 */
             box-sizing: border-box;
+            margin: 0;
         }
         .container {
             background-color: #3e4a5d;
@@ -118,7 +119,6 @@ WEATHER_TEMPLATE = """
         <div class="tips">
             <h2>生活小贴士</h2>
             {% for tip in life_tips %}
-            {# [更新] 在描述前增加了 tip.level 参数 #}
             <p><strong>{{ tip.name }}:</strong> {{ tip.level }}。{{ tip.description }}</p>
             {% endfor %}
         </div>
@@ -154,16 +154,13 @@ class WeatherPlugin(Star):
 
             weather_data = data["data"]
 
-            # 定义我们希望展示的生活指数的key
             desired_keys = ['clothes', 'sports', 'cold', 'ultraviolet', 'carwash', 'tourism']
             all_indices = weather_data.get("life_indices", [])
             
-            # 筛选出需要的生活指数
             display_tips = [
                 tip for tip in all_indices if tip['key'] in desired_keys
             ]
 
-            # 准备渲染模板所需的数据
             render_payload = {
                 "location": weather_data["location"],
                 "weather": weather_data["weather"],
@@ -172,8 +169,13 @@ class WeatherPlugin(Star):
                 "life_tips": display_tips
             }
 
-            # 调用html_render方法生成图片并获取URL
-            image_url = await self.html_render(WEATHER_TEMPLATE, render_payload)
+            # [新增] 定义高清渲染选项，使用2倍像素密度
+            render_options = {
+                "device_scale_factor": 2
+            }
+
+            # [更新] 调用html_render时传入高清选项
+            image_url = await self.html_render(WEATHER_TEMPLATE, render_payload, options=render_options)
             yield event.image_result(image_url)
 
         except httpx.RequestError as e:
